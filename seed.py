@@ -1,62 +1,89 @@
-from app import app, db
+import logging
+from config import app, db
 from models import User, Cocktail, Ingredient, CocktailIngredient, Review
 
-def seed_database():
-    with app.app_context():
-        print("Seeding database...")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def seed_data():
+    try:
+        logger.info("Starting the seeding process...")
 
         # Clear existing data
-        db.drop_all()
-        db.create_all()
+        deleted = Cocktail.query.delete()
+        db.session.commit()
+        logger.info(f"Deleted {deleted} existing cocktails.")
 
-        # Seed Users
-        user1 = User(username="cocktail_lover", email="lover@cocktails.com")
-        user1.set_password("password123")
-        db.session.add(user1)
+        cocktails = [
+            {
+                "name": "Mojito",
+                "id": 1,
+                "image": "/static/mojito.jpeg",
+                "ingredients": [
+                    "2 oz White Rum",
+                    "1 oz Fresh Lime Juice",
+                    "2 tsp Sugar",
+                    "6-8 Fresh Mint Leaves",
+                    "Club Soda",
+                    "Mint Sprig for garnish"
+                ],
+                "directions": "Muddle mint leaves and sugar with lime juice. Add rum and top with club soda. Garnish with mint sprig.",
+                "glass_type": "Highball Glass"
+            },
+            {
+                "name": "Margarita",
+                "id": 2,
+                "image": "/static/margarita.jpeg",
+                "ingredients": [
+                    "2 oz Tequila",
+                    "1 oz Lime Juice",
+                    "1 oz Triple Sec",
+                    "Salt for rimming glass",
+                    "Lime wedge for garnish"
+                ],
+                "directions": "Rub the rim of the glass with lime and dip in salt. Shake tequila, lime juice, and triple sec with ice. Strain into glass.",
+                "glass_type": "Cocktail Glass"
+            },
+            # Add more cocktails here as needed
+        ]
 
-        # Seed Cocktails
-        mojito = Cocktail(
-            name="Mojito",
-            instructions="Muddle mint leaves with sugar and lime juice. Add a splash of soda water and fill the glass with cracked ice. Pour the rum and top with soda water. Garnish with mint leaves and a lime wedge.",
-            image_url="https://example.com/mojito.jpg"
-        )
-        db.session.add(mojito)
+        for cocktail_data in cocktails:
+            cocktail = Cocktail(
+                id=cocktail_data['id'],
+                name=cocktail_data['name'],
+                image_url=cocktail_data['image'],
+                instructions=cocktail_data['directions'],
+                glass_type=cocktail_data['glass_type']
+            )
+            db.session.add(cocktail)
+            logger.debug(f"Added cocktail: {cocktail.name}")
 
-        margarita = Cocktail(
-            name="Margarita",
-            instructions="Rub the rim of the glass with the lime slice to make the salt stick to it. Shake the other ingredients with ice, then carefully pour into the glass (taking care not to dislodge any salt). Garnish and serve over ice.",
-            image_url="https://example.com/margarita.jpg"
-        )
-        db.session.add(margarita)
-
-        # Seed Ingredients
-        rum = Ingredient(name="White rum")
-        tequila = Ingredient(name="Tequila")
-        lime_juice = Ingredient(name="Lime juice")
-        sugar = Ingredient(name="Sugar")
-        mint = Ingredient(name="Mint leaves")
-        salt = Ingredient(name="Salt")
-        db.session.add_all([rum, tequila, lime_juice, sugar, mint, salt])
-
-        # Seed CocktailIngredients
-        mojito_rum = CocktailIngredient(cocktail=mojito, ingredient=rum, amount="60 ml")
-        mojito_lime = CocktailIngredient(cocktail=mojito, ingredient=lime_juice, amount="30 ml")
-        mojito_sugar = CocktailIngredient(cocktail=mojito, ingredient=sugar, amount="2 tsp")
-        mojito_mint = CocktailIngredient(cocktail=mojito, ingredient=mint, amount="6 leaves")
-
-        margarita_tequila = CocktailIngredient(cocktail=margarita, ingredient=tequila, amount="50 ml")
-        margarita_lime = CocktailIngredient(cocktail=margarita, ingredient=lime_juice, amount="25 ml")
-        margarita_salt = CocktailIngredient(cocktail=margarita, ingredient=salt, amount="1 tbsp")
-
-        db.session.add_all([mojito_rum, mojito_lime, mojito_sugar, mojito_mint, margarita_tequila, margarita_lime, margarita_salt])
-
-        # Seed Reviews
-        mojito_review = Review(content="Perfect for a hot summer day!", rating=5, user=user1, cocktail=mojito)
-        margarita_review = Review(content="Classic and delicious!", rating=4, user=user1, cocktail=margarita)
-        db.session.add_all([mojito_review, margarita_review])
+            # Add ingredients
+            for ingredient_str in cocktail_data['ingredients']:
+                parts = ingredient_str.split(' ', 1)
+                amount = parts[0] if len(parts) > 1 else ''
+                name = parts[1] if len(parts) > 1 else parts[0]
+                
+                ingredient = Ingredient.query.filter_by(name=name).first()
+                if not ingredient:
+                    ingredient = Ingredient(name=name)
+                    db.session.add(ingredient)
+                
+                cocktail_ingredient = CocktailIngredient(
+                    cocktail=cocktail,
+                    ingredient=ingredient,
+                    amount=amount
+                )
+                db.session.add(cocktail_ingredient)
 
         db.session.commit()
-        print("Database seeded!")
+        logger.info("Cocktail data seeded successfully!")
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"An error occurred while seeding data: {e}")
 
 if __name__ == "__main__":
-    seed_database()
+    with app.app_context():
+        seed_data()
+        print("Cocktail data seeded successfully!")
